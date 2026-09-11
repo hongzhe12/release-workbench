@@ -1,0 +1,25 @@
+<section
+    id="build-status"
+    class="workflow-section"
+    {% if build.status == "building" %}data-poll-url="{% url 'workbench:build_status' build.pk %}"{% endif %}
+>
+    <div class="section-heading">
+        <div>
+            <h2>构建状态</h2>
+            <span class="status-pill status-{{ build.status }}">{{ build.get_status_display }}</span>
+        </div>
+        {% if build.finished_at %}
+            <span class="muted">{{ build.finished_at|date:"Y-m-d H:i:s" }}</span>
+        {% endif %}
+    </div>
+
+    {% if build.package_path %}
+        <div class="package-result">
+            <span>SaaS 包</span>
+            <code>{{ build.package_path }}</code>
+        </div>
+    {% endif %}
+
+    <pre class="build-log">{{ build.log|default:"等待构建输出..." }}</pre>
+
+</section>

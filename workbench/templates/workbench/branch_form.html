@@ -1,0 +1,39 @@
+{% extends "workbench/base.html" %}
+
+{% block title %}创建开发分支{% endblock %}
+
+{% block content %}
+<section class="form-page narrow">
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">{{ repository.name }}</p>
+            <h1>创建开发分支</h1>
+            <p class="muted">
+                系统会先同步发布基线分支 {{ repository.baseline_branch }}，再从这里创建分支并推送。
+            </p>
+        </div>
+        <a class="button ghost" href="{{ repository.get_absolute_url }}">返回工作台</a>
+    </div>
+
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        <div class="form-field">
+            <label for="{{ form.type.id_for_label }}">{{ form.type.label }}</label>
+            {{ form.type }}
+            {% for error in form.type.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="form-field">
+            <label for="{{ form.short_name.id_for_label }}">{{ form.short_name.label }}</label>
+            {{ form.short_name }}
+            <p class="help-text">{{ form.short_name.help_text }}</p>
+            {% for error in form.short_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        {% for error in form.non_field_errors %}
+            <p class="field-error">{{ error }}</p>
+        {% endfor %}
+        <button class="button primary" type="submit" data-confirm="确认从最新 {{ repository.baseline_branch }} 创建并推送该开发分支？">
+            创建并推送
+        </button>
+    </form>
+</section>
+{% endblock %}

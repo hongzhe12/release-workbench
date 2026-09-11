@@ -1,0 +1,291 @@
+{% extends "workbench/base.html" %}
+
+{% block title %}发布工作台{% endblock %}
+
+{% block content %}
+{% if repository is None %}
+    <section class="empty-state">
+        <p class="eyebrow">第一次使用</p>
+        <h1>先把一个项目接入工作台</h1>
+        <p>配置本地仓库路径、远程名称、发布基线分支和验证分支后，即可读取 Git 状态。</p>
+        <a class="button primary" href="{% url 'workbench:repository_create' %}">添加项目</a>
+    </section>
+{% else %}
+    <section class="project-header">
+        <div>
+            <p class="eyebrow">当前项目</p>
+            <h1>{{ repository.name }}</h1>
+            <p class="muted mono">{{ repository.local_path }}</p>
+        </div>
+        {% if repositories.count > 1 %}
+            <form method="get" class="project-switcher">
+                <label for="project-select">切换项目</label>
+                <select id="project-select" name="repository" data-auto-submit>
+                    {% for item in repositories %}
+                        <option value="{{ item.pk }}" {% if item.pk == repository.pk %}selected{% endif %}>
+                            {{ item.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        {% endif %}
+    </section>
+
+    <section class="branch-strip">
+        <div class="branch-state">
+            <span class="branch-label">发布基线</span>
+            <code>{{ repository.baseline_branch }}</code>
+            {% if snapshot.ok %}
+                <span class="status-dot {% if snapshot.clean %}ok{% else %}bad{% endif %}"></span>
+                <span>{% if snapshot.clean %}clean{% else %}dirty{% endif %}</span>
+                <code>{{ snapshot.baseline_commit|slice:":12"|default:"未找到" }}</code>
+            {% else %}
+                <span class="status-dot bad"></span>
+                <span>读取失败</span>
+            {% endif %}
+        </div>
+        <div class="branch-state">
+            <span class="branch-label">验证分支</span>
+            <code>{{ repository.verification_branch }}</code>
+            {% if snapshot.ok %}
+                <span class="status-dot {% if snapshot.clean %}ok{% else %}bad{% endif %}"></span>
+                <span>{% if snapshot.clean %}clean{% else %}dirty{% endif %}</span>
+                <code>{{ snapshot.verification_commit|slice:":12"|default:"未找到" }}</code>
+            {% else %}
+                <span class="status-dot bad"></span>
+                <span>读取失败</span>
+            {% endif %}
+        </div>
+        <div class="branch-state">
+            <span class="branch-label">当前分支</span>
+            <code>{{ snapshot.current_branch|default:"-" }}</code>
+        </div>
+        {% if not snapshot.ok %}
+            <div class="inline-error">{{ snapshot.error }}</div>
+        {% endif %}
+    </section>
+
+    <section class="workflow-section">
+        <div class="section-heading">
+            <div>
+                <span class="step-number">01</span>
+                <h2>开发分支</h2>
+            </div>
+            <a class="button secondary" href="{% url 'workbench:branch_create' repository.pk %}">
+                创建 / 管理
+            </a>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>分支</th>
+                        <th>类型</th>
+                        <th>验证</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for branch in branches %}
+                        <tr>
+                            <td class="mono">{{ branch.name }}</td>
+                            <td>{{ branch.get_type_display }}</td>
+                            <td>
+                                {% if branch.verification_record %}
+                                    <span class="status-pill status-{{ branch.verification_record.status }}">
+                                        {{ branch.verification_record.get_status_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="status-pill">未记录</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ branch.verification_record.remark|default:"-"|truncatechars:60 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="empty-cell">还没有由工作台管理的开发分支。</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="workflow-section">
+        <div class="section-heading">
+            <div>
+                <span class="step-number">02</span>
+                <h2>验证</h2>
+            </div>
+            <span class="muted">验证分支 <code>{{ repository.verification_branch }}</code></span>
+        </div>
+        <div class="summary-line">
+            <span>待验证 {{ verification_counts.pending|default:0 }}</span>
+            <span>验证中 {{ verification_counts.testing|default:0 }}</span>
+            <span class="success-text">验证通过 {{ verification_counts.passed|default:0 }}</span>
+            <span class="danger-text">验证失败 {{ verification_counts.failed|default:0 }}</span>
+        </div>
+
+        <div class="verification-guide">
+            <span><strong>1</strong> 合入验证分支</span>
+            <span class="guide-arrow">→</span>
+            <span><strong>2</strong> 在 <code>{{ repository.verification_branch }}</code> 环境测试</span>
+            <span class="guide-arrow">→</span>
+            <span><strong>3</strong> 保存验证结果</span>
+        </div>
+
+        <div class="verification-record-list">
+            {% for branch in branches %}
+                {% if branch.verification_record %}
+                    <div class="verification-branch-row">
+                        <div class="verification-main">
+                            <div class="verification-branch">
+                                <strong class="mono">{{ branch.name }}</strong>
+                                {% if branch.verification_record.merged_commit %}
+                                    <small>
+                                        已合入提交
+                                        <code>{{ branch.verification_record.merged_commit|slice:":12" }}</code>
+                                    </small>
+                                {% else %}
+                                    <small>尚未合入 {{ repository.verification_branch }}</small>
+                                {% endif %}
+                            </div>
+
+                            <div class="verification-stage">
+                                {% if branch.verification_record.merged_commit %}
+                                    <span class="status-pill status-{{ branch.verification_record.status }}">
+                                        {{ branch.verification_record.get_status_display }}
+                                    </span>
+                                    <small>下一步：根据测试结果保存状态</small>
+                                {% else %}
+                                    <span class="status-pill">待合入</span>
+                                    <small>下一步：先合入验证分支</small>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="verification-actions">
+                            <form method="post" action="{% url 'workbench:verification_merge' repository.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="branches" value="{{ branch.pk }}">
+                                <button
+                                    class="button {% if branch.verification_record.merged_commit %}secondary{% else %}primary{% endif %}"
+                                    type="submit"
+                                    data-confirm="确认把 {{ branch.name }} 合入 {{ repository.verification_branch }} 并推送？"
+                                >
+                                    {% if branch.verification_record.merged_commit %}重新合入{% else %}合入验证分支{% endif %}
+                                </button>
+                            </form>
+
+                            {% if branch.verification_record.merged_commit %}
+                                <form
+                                    class="verification-status-form"
+                                    method="post"
+                                    action="{% url 'workbench:verification_record_update' branch.verification_record.pk %}"
+                                >
+                                    {% csrf_token %}
+                                    <select name="status" aria-label="{{ branch.name }} 验证状态">
+                                        <option value="pending" {% if branch.verification_record.status == "pending" %}selected{% endif %}>待验证</option>
+                                        <option value="testing" {% if branch.verification_record.status == "testing" %}selected{% endif %}>验证中</option>
+                                        <option value="passed" {% if branch.verification_record.status == "passed" %}selected{% endif %}>验证通过</option>
+                                        <option value="failed" {% if branch.verification_record.status == "failed" %}selected{% endif %}>验证失败</option>
+                                    </select>
+                                    <input
+                                        type="text"
+                                        name="remark"
+                                        value="{{ branch.verification_record.remark }}"
+                                        placeholder="填写验证备注"
+                                        aria-label="{{ branch.name }} 备注"
+                                    >
+                                    <button class="button secondary" type="submit">保存验证结果</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% empty %}
+                <p class="empty-cell">暂无验证记录。</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="workflow-section">
+        <div class="section-heading">
+            <div>
+                <span class="step-number">03</span>
+                <h2>本次发布</h2>
+            </div>
+            {% if active_release %}
+                <span class="status-pill status-{{ active_release.status }}">
+                    {{ active_release.get_status_display }}
+                </span>
+            {% endif %}
+        </div>
+        {% if active_release %}
+            <div class="active-release">
+                <div>
+                    <p class="eyebrow">当前 Release</p>
+                    <h3 class="mono">{{ active_release.name }}</h3>
+                    <p class="locked-release-hint">
+                        本次上线内容创建后已锁定，后续新增的开发分支不会自动加入。
+                    </p>
+                    <ul class="release-branch-list">
+                        {% for branch in active_release.branches.all %}
+                            <li class="mono">{{ branch.name }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <a class="button primary" href="{% url 'workbench:release_detail' active_release.pk %}">
+                    继续处理
+                </a>
+            </div>
+        {% else %}
+            {% if passed_branches %}
+                <form method="post" action="{% url 'workbench:release_create' repository.pk %}">
+                    {% csrf_token %}
+                    <p class="muted">只允许选择验证通过，且验证提交仍有效的分支。</p>
+                    <div class="choice-list">
+                        {% for branch in passed_branches %}
+                            <label class="choice">
+                                <input type="checkbox" name="branches" value="{{ branch.pk }}">
+                                <span>
+                                    <strong class="mono">{{ branch.name }}</strong>
+                                    <small>验证提交 {{ branch.verification_record.merged_commit|slice:":12" }}</small>
+                                </span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <button class="button primary" type="submit" data-confirm="确认基于最新 {{ repository.baseline_branch }} 创建预发布分支并合并所选内容？">
+                        创建预发布分支
+                    </button>
+                </form>
+            {% else %}
+                <p class="empty-cell">没有可发布的验证通过分支。</p>
+            {% endif %}
+        {% endif %}
+    </section>
+
+    <section class="workflow-section">
+        <div class="section-heading">
+            <div>
+                <span class="step-number">04</span>
+                <h2>最近 Release</h2>
+            </div>
+            <a class="button ghost" href="{% url 'workbench:operation_logs' repository.pk %}">
+                操作日志
+            </a>
+        </div>
+        {% if latest_release %}
+            <a class="release-row" href="{% url 'workbench:release_detail' latest_release.pk %}">
+                <span class="mono">{{ latest_release.name }}</span>
+                <span class="status-pill status-{{ latest_release.status }}">
+                    {{ latest_release.get_status_display }}
+                </span>
+                <span class="muted">{{ latest_release.created_at|date:"Y-m-d H:i" }}</span>
+            </a>
+        {% else %}
+            <p class="empty-cell">尚未创建 Release。</p>
+        {% endif %}
+    </section>
+{% endif %}
+{% endblock %}

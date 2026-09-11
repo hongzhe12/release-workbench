@@ -1,0 +1,65 @@
+{% extends "workbench/base.html" %}
+
+{% block title %}Git 操作日志{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">{{ repository.name }}</p>
+        <h1>Git 操作日志</h1>
+        <p class="muted">每次工具执行的 Git 命令、结果和输出都会保留。</p>
+    </div>
+    <a class="button ghost" href="{{ repository.get_absolute_url }}">返回工作台</a>
+</div>
+
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>Git 自动操作</h2>
+        <span class="muted">用于确认执行结果和恢复状态</span>
+    </div>
+    <div class="log-list">
+        {% for operation in operations %}
+            <details class="log-entry" {% if operation.status != "succeeded" %}open{% endif %}>
+                <summary>
+                    <span>{{ operation.created_at|date:"Y-m-d H:i:s" }}</span>
+                    <strong>{{ operation.get_operation_type_display }}</strong>
+                    <code>{{ operation.target }}</code>
+                    <span class="status-pill status-{{ operation.status }}">
+                        {{ operation.get_status_display }}
+                    </span>
+                </summary>
+                <pre>最终 SHA: {{ operation.final_sha|default:"待确认" }}
+幂等键: {{ operation.idempotency_key }}
+
+{{ operation.log|default:"暂无日志" }}</pre>
+            </details>
+        {% empty %}
+            <p class="empty-cell">暂无自动操作记录。</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>Git 命令日志</h2>
+    </div>
+<div class="log-list">
+    {% for log in logs %}
+        <details class="log-entry" {% if log.result == "failed" %}open{% endif %}>
+            <summary>
+                <span>{{ log.created_at|date:"Y-m-d H:i:s" }}</span>
+                <strong>{{ log.action }}</strong>
+                <code>{{ log.command }}</code>
+                <span class="status-pill status-{% if log.result == 'success' %}passed{% else %}failed{% endif %}">
+                    {{ log.get_result_display }}
+                </span>
+            </summary>
+            {% if log.stdout %}<pre>stdout\n{{ log.stdout }}</pre>{% endif %}
+            {% if log.stderr %}<pre>stderr\n{{ log.stderr }}</pre>{% endif %}
+        </details>
+    {% empty %}
+        <p class="empty-cell">暂无 Git 操作日志。</p>
+    {% endfor %}
+</div>
+</section>
+{% endblock %}

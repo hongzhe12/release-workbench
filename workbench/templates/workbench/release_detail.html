@@ -1,0 +1,189 @@
+{% extends "workbench/base.html" %}
+
+{% block title %}{{ release.name }}{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">{{ repository.name }}</p>
+        <h1 class="mono">{{ release.name }}</h1>
+        <p>
+            <span class="status-pill status-{{ release.status }}">{{ release.get_status_display }}</span>
+            <span class="muted">
+                基于发布基线 {{ repository.baseline_branch }}
+                {{ release.base_commit|slice:":12" }}
+            </span>
+        </p>
+    </div>
+    <a class="button ghost" href="{{ repository.get_absolute_url }}">返回工作台</a>
+</div>
+
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>发布内容</h2>
+    </div>
+    <p class="locked-release-hint">
+        本次上线内容在 Release 创建时已锁定，后续新增的开发分支不会自动加入。
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>分支</th>
+                    <th>验证提交</th>
+                    <th>验证状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for branch in release.branches.all %}
+                    <tr>
+                        <td class="mono">{{ branch.name }}</td>
+                        <td class="mono">{{ branch.verification_record.merged_commit|slice:":12" }}</td>
+                        <td>{{ branch.verification_record.get_status_display }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>流程操作</h2>
+    </div>
+    <div class="action-row">
+        {% if can_continue_merge %}
+            <form method="post" action="{% url 'workbench:release_continue_merge' release.pk %}">
+                {% csrf_token %}
+                <button class="button secondary" type="submit" data-confirm="确认冲突已经解决且工作区 clean，继续合并剩余分支？">
+                    继续合并
+                </button>
+            </form>
+        {% endif %}
+
+        {% if can_check %}
+            <form method="post" action="{% url 'workbench:release_check' release.pk %}">
+                {% csrf_token %}
+                <button class="button secondary" type="submit">检查 Release</button>
+            </form>
+        {% endif %}
+
+        {% if can_build %}
+            <form method="post" action="{% url 'workbench:release_build' release.pk %}">
+                {% csrf_token %}
+                <button class="button primary" type="submit" data-confirm="确认执行仓库根目录的 build.sh？同一 Release 只能成功构建一次。">
+                    执行 SaaS 打包
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    {% if not build_enabled %}
+        <p class="notice">当前项目未启用 SaaS 打包，Release 检查通过后可直接记录生产验证。</p>
+    {% endif %}
+
+    {% if release.check_result %}
+        <pre class="check-result">{{ release.check_result }}</pre>
+    {% endif %}
+</section>
+
+{% if build %}
+<section class="workflow-section">
+    <div class="section-heading">
+        <div>
+            <h2>SaaS 构建</h2>
+            <span class="status-pill status-{{ build.status }}">{{ build.get_status_display }}</span>
+        </div>
+        <a class="button ghost" href="{% url 'workbench:build_detail' build.pk %}">查看日志</a>
+    </div>
+    {% if build.package_path %}
+        <p>构建产物：<code>{{ build.package_path }}</code></p>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if can_verify %}
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>生产验证</h2>
+    </div>
+    <p class="muted">工作台不会自动发布生产。人工发布并验证完成后，在这里记录结果。</p>
+    <form method="post" action="{% url 'workbench:release_verify' release.pk %}" class="inline-form">
+        {% csrf_token %}
+        <label for="verify-confirmation">输入“生产验证通过”</label>
+        <input id="verify-confirmation" type="text" name="confirmation" autocomplete="off">
+        <button class="button primary" type="submit">记录验证通过</button>
+    </form>
+</section>
+{% endif %}
+
+{% if can_merge_baseline %}
+<section class="workflow-section danger-zone">
+    <div class="section-heading">
+        <h2>Release 合入发布基线</h2>
+    </div>
+    <p>
+        该操作会更新 {{ repository.baseline_branch }} 并推送远程。输入完整分支名完成二次确认。
+    </p>
+    <form method="post" action="{% url 'workbench:release_merge_baseline' release.pk %}" class="inline-form">
+        {% csrf_token %}
+        <label for="baseline-confirmation">确认输入 <code>{{ release.name }}</code></label>
+        <input id="baseline-confirmation" type="text" name="confirmation" autocomplete="off">
+        <button class="button danger" type="submit" data-confirm="确认把生产验证过的 Release 合入并推送 {{ repository.baseline_branch }}？">
+            合入发布基线
+        </button>
+    </form>
+</section>
+{% endif %}
+
+{% if can_cancel %}
+<section class="workflow-section danger-zone">
+    <div class="section-heading">
+        <h2>放弃本次 Release</h2>
+    </div>
+    <p>
+        放弃后保留当前分支、构建产物和日志，但不能再继续构建或发布。
+        输入完整分支名后，可以重新创建带序号的新 Release。
+    </p>
+    <form method="post" action="{% url 'workbench:release_cancel' release.pk %}" class="inline-form">
+        {% csrf_token %}
+        <label for="cancel-confirmation">确认输入 <code>{{ release.name }}</code></label>
+        <input id="cancel-confirmation" type="text" name="confirmation" autocomplete="off">
+        <button class="button danger" type="submit" data-confirm="确认放弃 {{ release.name }}？原记录和日志会保留。">
+            放弃本次 Release
+        </button>
+    </form>
+</section>
+{% endif %}
+
+<section class="workflow-section">
+    <div class="section-heading">
+        <h2>最近 Git 操作</h2>
+        <a class="button ghost" href="{% url 'workbench:operation_logs' repository.pk %}">全部日志</a>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>动作</th>
+                    <th>命令</th>
+                    <th>结果</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in operation_logs %}
+                    <tr>
+                        <td>{{ log.created_at|date:"m-d H:i:s" }}</td>
+                        <td>{{ log.action }}</td>
+                        <td class="mono command-cell">{{ log.command }}</td>
+                        <td>{{ log.get_result_display }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty-cell">暂无日志。</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "workbench/base.html" %}
+
+{% block title %}构建日志{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">{{ repository.name }}</p>
+        <h1 class="mono">{{ release.name }}</h1>
+        <p class="muted">SaaS 打包日志</p>
+    </div>
+    <a class="button ghost" href="{% url 'workbench:release_detail' release.pk %}">返回 Release</a>
+</div>
+
+{% include "workbench/_build_status.html" %}
+{% endblock %}

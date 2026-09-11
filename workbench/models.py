@@ -268,8 +268,8 @@ class GitOperationLog(models.Model):
         max_length=20,
         choices=Result.choices,
     )
-    stdout = models.TextField("stdout", blank=True)
-    stderr = models.TextField("stderr", blank=True)
+    stdout = models.TextField("stdout", blank=True,null = True)
+    stderr = models.TextField("stderr", blank=True,null = True)
     created_at = models.DateTimeField("时间", auto_now_add=True)
 
     class Meta:

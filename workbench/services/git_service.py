@@ -124,7 +124,7 @@ class GitService:
         self.remote = repository.remote_url
         self.timeout = settings.WORKBENCH_GIT_TIMEOUT_SECONDS
 
-    def run(self, args, action, check=True):
+    def run(self, args, action, check=True, ok_codes=(0,)):
         command_parts = ["git", *args]
         command = redact_command(command_parts)
         try:
@@ -133,6 +133,8 @@ class GitService:
                 cwd=str(self.repo_path),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -154,13 +156,13 @@ class GitService:
                 message=f"{action}超时。",
             ) from exc
 
-        stdout = completed.stdout.strip()
-        stderr = completed.stderr.strip()
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
         completed.stdout = stdout
         completed.stderr = stderr
         result = (
             GitOperationLog.Result.SUCCESS
-            if completed.returncode == 0
+            if completed.returncode in ok_codes
             else GitOperationLog.Result.FAILED
         )
         self._write_log(
@@ -214,8 +216,7 @@ class GitService:
         ]
         if blocking_entries:
             raise WorkflowError(
-                "工作区存在未提交修改，禁止继续 Git 操作。"
-                "请先提交、暂存或清理现场。"
+                "工作区存在未提交修改，禁止继续 Git 操作。" "请先提交、暂存或清理现场。"
             )
 
     def status_porcelain(self):
@@ -241,6 +242,7 @@ class GitService:
             ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
             f"检查本地分支 {branch}",
             check=False,
+            ok_codes=(0, 1),
         )
         return result.returncode == 0
 
@@ -321,6 +323,7 @@ class GitService:
             ["merge-base", "--is-ancestor", ancestor, descendant],
             f"检查 {ancestor} 是否已包含在 {descendant}",
             check=False,
+            ok_codes=(0, 1),
         )
         if result.returncode not in (0, 1):
             raise WorkflowError(f"无法检查提交关系：{ancestor} -> {descendant}")
@@ -346,6 +349,7 @@ class GitService:
             ],
             f"检查 {ref} 冲突标记",
             check=False,
+            ok_codes=(0, 1),
         )
         if result.returncode == 0:
             return result.stdout
@@ -370,7 +374,9 @@ class GitService:
                     self.repository.baseline_branch
                 )
             if self.local_branch_exists(self.repository.verification_branch):
-                result["verification_commit"] = self.ref_sha(self.repository.verification_branch)
+                result["verification_commit"] = self.ref_sha(
+                    self.repository.verification_branch
+                )
             return result
         except (WorkflowError, GitCommandError) as exc:
             return {

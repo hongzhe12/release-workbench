@@ -28,9 +28,7 @@ def _resolve_build_command(repository):
     repo_path = Path(repository.local_path).expanduser().resolve()
     script_path = (repo_path / "build.sh").resolve()
     if not script_path.exists() or not script_path.is_file():
-        raise WorkflowError(
-            f"仓库根目录缺少标准打包脚本 build.sh：{script_path}"
-        )
+        raise WorkflowError(f"仓库根目录缺少标准打包脚本 build.sh：{script_path}")
     return ["/bin/sh", str(script_path)]
 
 
@@ -75,6 +73,8 @@ def _execute_build(build_id):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             env=env,
         )
@@ -103,15 +103,11 @@ def _execute_build(build_id):
 
         build = BuildRecord.objects.select_related("release").get(pk=build_id)
         build.status = (
-            BuildRecord.Status.SUCCESS
-            if returncode == 0
-            else BuildRecord.Status.FAILED
+            BuildRecord.Status.SUCCESS if returncode == 0 else BuildRecord.Status.FAILED
         )
         build.package_path = package_path
         build.finished_at = timezone.now()
-        build.save(
-            update_fields=["status", "package_path", "finished_at"]
-        )
+        build.save(update_fields=["status", "package_path", "finished_at"])
 
     except Exception as exc:
         close_old_connections()

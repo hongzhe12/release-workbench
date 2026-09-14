@@ -6,9 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from django.conf import settings
-from django.utils import timezone
 
-from workbench.models import GitOperation, GitOperationLog
+from workbench.models import GitOperationLog
 
 
 REMOTE_CREDENTIALS = re.compile(r"(?P<scheme>https?://)[^/@\s]+@")
@@ -50,70 +49,6 @@ def repository_operation(repository_id):
 
 def redact_command(parts):
     return REMOTE_CREDENTIALS.sub(r"\g<scheme>***@", shlex.join(parts))
-
-
-def _append_operation_log(operation, message):
-    timestamp = timezone.localtime().strftime("%H:%M:%S")
-    operation.log = f"{operation.log.rstrip()}\n[{timestamp}] {message}".strip()
-    operation.save(update_fields=["log", "updated_at"])
-
-
-def execute_git_operation(
-    *,
-    repository,
-    operation_type,
-    target,
-    idempotency_key,
-    preflight,
-    execute,
-    verify,
-):
-    operation, created = GitOperation.objects.get_or_create(
-        idempotency_key=idempotency_key,
-        defaults={
-            "repository": repository,
-            "operation_type": operation_type,
-            "target": target,
-        },
-    )
-    if not created:
-        try:
-            final_sha = verify(operation, False)
-        except Exception:
-            final_sha = ""
-        if final_sha:
-            operation.status = GitOperation.Status.SUCCEEDED
-            operation.final_sha = final_sha
-            operation.save(update_fields=["status", "final_sha", "updated_at"])
-            _append_operation_log(operation, f"Git 校验确认已完成，SHA={final_sha}")
-            return operation, True
-        operation.status = GitOperation.Status.PENDING
-        operation.save(update_fields=["status", "updated_at"])
-
-    try:
-        preflight(operation, created)
-    except Exception as exc:
-        operation.status = GitOperation.Status.FAILED
-        operation.save(update_fields=["status", "updated_at"])
-        _append_operation_log(operation, f"执行前检查失败：{exc}")
-        raise
-
-    try:
-        execute(operation, created)
-        final_sha = verify(operation, created)
-        if not final_sha:
-            raise RuntimeError("Git 操作已执行，但无法确认最终状态。")
-    except Exception as exc:
-        operation.status = GitOperation.Status.UNKNOWN
-        operation.save(update_fields=["status", "updated_at"])
-        _append_operation_log(operation, f"Git 结果待确认：{exc}")
-        raise
-
-    operation.status = GitOperation.Status.SUCCEEDED
-    operation.final_sha = final_sha
-    operation.save(update_fields=["status", "final_sha", "updated_at"])
-    _append_operation_log(operation, f"Git 操作完成，SHA={final_sha}")
-    return operation, False
 
 
 class GitService:
@@ -207,6 +142,20 @@ class GitService:
     def ensure_remote_reachable(self):
         self.run(["ls-remote", "--heads", self.remote], "检查远程仓库")
 
+    def remote_branches(self):
+        result = self.run(
+            ["ls-remote", "--heads", self.remote],
+            "读取远程分支列表",
+        )
+        prefix = "refs/heads/"
+        branches = set()
+        for line in result.stdout.splitlines():
+            parts = line.split("\t", 1)
+            if len(parts) != 2 or not parts[1].startswith(prefix):
+                continue
+            branches.add(parts[1][len(prefix):])
+        return sorted(branches)
+
     def ensure_clean(self, allow_untracked=False):
         entries = self.status_porcelain().splitlines()
         blocking_entries = [
@@ -292,6 +241,12 @@ class GitService:
         self.run(
             ["checkout", "-b", branch, base_branch],
             f"创建分支 {branch}",
+        )
+
+    def create_local_branch(self, branch, start_point):
+        self.run(
+            ["branch", branch, start_point],
+            f"登记已有分支 {branch}",
         )
 
     def push_new_branch(self, branch):

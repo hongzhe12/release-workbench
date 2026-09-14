@@ -1,15 +1,16 @@
 {% extends "workbench/base.html" %}
 
-{% block title %}创建开发分支{% endblock %}
+{% block title %}添加开发分支{% endblock %}
 
 {% block content %}
 <section class="form-page narrow">
     <div class="page-heading">
         <div>
             <p class="eyebrow">{{ repository.name }}</p>
-            <h1>创建开发分支</h1>
+            <h1>添加开发分支</h1>
             <p class="muted">
-                系统会先同步发布基线分支 {{ repository.baseline_branch }}，再从这里创建分支并推送。
+                可以新建分支并推送，也可以登记仓库中已有的
+                feature 或 bugfix 分支。
             </p>
         </div>
         <a class="button ghost" href="{{ repository.get_absolute_url }}">返回工作台</a>
@@ -17,22 +18,62 @@
 
     <form method="post" class="stack-form">
         {% csrf_token %}
-        <div class="form-field">
-            <label for="{{ form.type.id_for_label }}">{{ form.type.label }}</label>
-            {{ form.type }}
-            {% for error in form.type.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        <div class="form-field full-width">
+            <span class="field-label">{{ form.mode.label }}</span>
+            <div class="branch-mode-options">
+                {% for radio in form.mode %}
+                    <label class="branch-mode-option">
+                        {{ radio.tag }}
+                        <span>{{ radio.choice_label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+            {% for error in form.mode.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
         </div>
-        <div class="form-field">
-            <label for="{{ form.short_name.id_for_label }}">{{ form.short_name.label }}</label>
-            {{ form.short_name }}
-            <p class="help-text">{{ form.short_name.help_text }}</p>
-            {% for error in form.short_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+
+        <div class="branch-mode-panel" data-branch-panel="create">
+            <div class="form-field">
+                <label for="{{ form.type.id_for_label }}">{{ form.type.label }}</label>
+                {{ form.type }}
+                {% for error in form.type.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="form-field">
+                <label for="{{ form.short_name.id_for_label }}">{{ form.short_name.label }}</label>
+                {{ form.short_name }}
+                <p class="help-text">{{ form.short_name.help_text }}</p>
+                {% for error in form.short_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <p class="help-text">
+                新建时会先同步发布基线分支 {{ repository.baseline_branch }}，
+                再创建并推送远端分支。
+            </p>
         </div>
+
+        <div class="branch-mode-panel" data-branch-panel="existing">
+            <div class="form-field">
+                <label for="{{ form.existing_branch.id_for_label }}">{{ form.existing_branch.label }}</label>
+                {{ form.existing_branch }}
+                {% if form.existing_branches %}
+                    <p class="help-text">
+                        仅显示尚未登记的 feature 和 bugfix 远端分支。
+                    </p>
+                {% else %}
+                    <p class="help-text">当前没有可登记的已有开发分支。</p>
+                {% endif %}
+                {% for error in form.existing_branch.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {% if branch_list_error %}
+                <div class="inline-error">
+                    读取已有分支失败：{{ branch_list_error }}
+                </div>
+            {% endif %}
+        </div>
+
         {% for error in form.non_field_errors %}
             <p class="field-error">{{ error }}</p>
         {% endfor %}
-        <button class="button primary" type="submit" data-confirm="确认从最新 {{ repository.baseline_branch }} 创建并推送该开发分支？">
-            创建并推送
+        <button class="button primary" type="submit" data-confirm="确认添加该开发分支？">
+            确认添加
         </button>
     </form>
 </section>

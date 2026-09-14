@@ -43,6 +43,25 @@
         });
     });
 
+    var branchModeInputs = document.querySelectorAll(
+        '.branch-mode-options input[name="mode"]'
+    );
+    if (branchModeInputs.length) {
+        var syncBranchMode = function () {
+            var selected = document.querySelector(
+                '.branch-mode-options input[name="mode"]:checked'
+            );
+            var mode = selected ? selected.value : "create";
+            document.querySelectorAll("[data-branch-panel]").forEach(function (panel) {
+                panel.hidden = panel.dataset.branchPanel !== mode;
+            });
+        };
+        branchModeInputs.forEach(function (input) {
+            input.addEventListener("change", syncBranchMode);
+        });
+        syncBranchMode();
+    }
+
     document.querySelectorAll("form").forEach(function (form) {
         form.addEventListener("submit", function () {
             window.setTimeout(function () {

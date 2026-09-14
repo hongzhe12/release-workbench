@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -12,6 +13,7 @@ from .forms import (
     VerificationRecordUpdateForm,
 )
 from .models import (
+    Branch,
     BuildRecord,
     Release,
     Repository,
@@ -28,6 +30,7 @@ from .services.workflows import (
     mark_production_verified,
     merge_branches_to_verification,
     merge_release_to_baseline,
+    register_development_branch,
     update_verification_status,
 )
 
@@ -118,19 +121,67 @@ def repository_create(request):
 
 def branch_create(request, repository_id):
     repository = get_object_or_404(Repository, pk=repository_id)
-    form = BranchCreateForm(request.POST or None)
+    existing_branches = []
+    branch_list_error = ""
+    try:
+        git = GitService(repository, _operator())
+        git.ensure_repository()
+        registered_names = set(
+            repository.branches.values_list("name", flat=True)
+        )
+        reserved_names = {
+            repository.baseline_branch,
+            repository.verification_branch,
+        }
+        for branch_name in git.remote_branches():
+            if (
+                branch_name in registered_names
+                or branch_name in reserved_names
+            ):
+                continue
+            try:
+                branch_type, short_name = Branch.split_name(branch_name)
+                normalized = Branch.make_name(branch_type, short_name)
+            except ValidationError:
+                continue
+            if normalized == branch_name:
+                existing_branches.append(branch_name)
+    except WorkflowError as exc:
+        branch_list_error = str(exc)
+
+    form = BranchCreateForm(
+        request.POST or None,
+        existing_branches=existing_branches,
+    )
     if request.method == "POST" and form.is_valid():
         try:
-            branch = create_development_branch(
-                repository=repository,
-                branch_type=form.cleaned_data["type"],
-                short_name=form.cleaned_data["short_name"],
-                operator=_operator(),
-            )
+            if form.cleaned_data["mode"] == BranchCreateForm.Mode.CREATE:
+                branch = create_development_branch(
+                    repository=repository,
+                    branch_type=form.cleaned_data["branch_type"],
+                    short_name=form.cleaned_data["short_name"],
+                    operator=_operator(),
+                )
+                messages.success(request, f"已创建并推送分支 {branch.name}。")
+            else:
+                branch, created = register_development_branch(
+                    repository=repository,
+                    branch_name=form.cleaned_data["branch_name"],
+                    operator=_operator(),
+                )
+                if created:
+                    messages.success(
+                        request,
+                        f"已登记已有分支 {branch.name}。",
+                    )
+                else:
+                    messages.info(
+                        request,
+                        f"分支 {branch.name} 已经登记。",
+                    )
         except WorkflowError as exc:
             _workflow_error(request, exc)
         else:
-            messages.success(request, f"已创建并推送分支 {branch.name}。")
             return _redirect_workbench(repository)
     return render(
         request,
@@ -138,6 +189,7 @@ def branch_create(request, repository_id):
         {
             "repository": repository,
             "form": form,
+            "branch_list_error": branch_list_error,
         },
     )
 
@@ -401,13 +453,11 @@ def release_cancel(request, release_id):
 def operation_logs(request, repository_id):
     repository = get_object_or_404(Repository, pk=repository_id)
     logs = repository.git_logs.all()[:500]
-    operations = repository.git_operations.all()[:50]
     return render(
         request,
         "workbench/operation_logs.html",
         {
             "repository": repository,
             "logs": logs,
-            "operations": operations,
         },
     )

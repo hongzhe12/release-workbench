@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 
+from workbench.forms import BranchCreateForm
 from workbench.models import (
     Branch,
     BuildRecord,
@@ -22,6 +23,42 @@ class PageSmokeTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "添加 Git 仓库")
+
+    def test_branch_form_offers_create_and_existing_modes(self):
+        repository = Repository.objects.create(
+            name="project",
+            local_path="/tmp",
+            remote_url="origin",
+            baseline_branch="stable",
+            verification_branch="uat",
+        )
+
+        response = self.client.get(
+            reverse("workbench:branch_create", args=[repository.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "新建分支")
+        self.assertContains(response, "选择已有分支")
+
+    def test_existing_branch_form_infers_branch_type(self):
+        form = BranchCreateForm(
+            {
+                "mode": BranchCreateForm.Mode.EXISTING,
+                "existing_branch": "bugfix/existing-fix",
+            },
+            existing_branches=["bugfix/existing-fix"],
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["branch_type"],
+            Branch.BranchType.BUGFIX,
+        )
+        self.assertEqual(
+            form.cleaned_data["branch_name"],
+            "bugfix/existing-fix",
+        )
 
     def test_dashboard_with_repository_renders(self):
         repository = Repository.objects.create(

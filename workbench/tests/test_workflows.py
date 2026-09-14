@@ -9,7 +9,6 @@ from django.test import TransactionTestCase
 from workbench.models import (
     Branch,
     BuildRecord,
-    GitOperation,
     Release,
     Repository,
     VerificationRecord,
@@ -24,6 +23,7 @@ from workbench.services.workflows import (
     mark_production_verified,
     merge_branches_to_verification,
     merge_release_to_baseline,
+    register_development_branch,
     update_verification_status,
 )
 
@@ -225,6 +225,19 @@ class WorkflowIntegrationTests(TransactionTestCase):
         release.refresh_from_db()
         self.assertEqual(release.status, Release.Status.PRODUCTION_VERIFIED)
 
+    def test_rechecking_keeps_production_verified_status(self):
+        branch = self._prepare_passed_branch()
+        release = create_release(self.repository, [branch.pk], "tester")
+        check_release(release, "tester")
+        release.refresh_from_db()
+        mark_production_verified(release)
+        release.refresh_from_db()
+
+        check_release(release, "tester")
+        release.refresh_from_db()
+
+        self.assertEqual(release.status, Release.Status.PRODUCTION_VERIFIED)
+
     def test_successful_build_cannot_run_twice(self):
         branch = self._prepare_passed_branch()
         release = create_release(self.repository, [branch.pk], "tester")
@@ -237,68 +250,69 @@ class WorkflowIntegrationTests(TransactionTestCase):
         with self.assertRaisesMessage(WorkflowError, "已构建成功"):
             start_build(release, "tester")
 
-    def test_branch_creation_recovers_when_database_record_is_missing(self):
-        branch = self._create_branch_with_change("recover-branch")
-        Branch.objects.filter(pk=branch.pk).delete()
+    def test_register_existing_remote_branch_creates_local_copy(self):
+        self._git("checkout", "-b", "feature/existing", "stable")
+        (self.work / "existing.txt").write_text(
+            "existing branch\n",
+            encoding="utf-8",
+        )
+        self._git("add", "existing.txt")
+        self._git("commit", "-m", "add existing branch")
+        self._git("push", "-u", "origin", "feature/existing")
+        self._git("checkout", "stable")
+        self._git("branch", "-D", "feature/existing")
 
-        recovered = create_development_branch(
+        branch, created = register_development_branch(
             self.repository,
-            Branch.BranchType.FEATURE,
-            "recover-branch",
+            "feature/existing",
             "tester",
         )
 
-        self.assertEqual(recovered.name, "feature/recover-branch")
+        self.assertTrue(created)
+        self.assertEqual(branch.name, "feature/existing")
+        self.assertEqual(branch.type, Branch.BranchType.FEATURE)
+        self.assertTrue(
+            VerificationRecord.objects.filter(
+                branch=branch,
+                status=VerificationRecord.Status.PENDING,
+            ).exists()
+        )
         self.assertEqual(
-            GitOperation.objects.filter(
-                operation_type=GitOperation.OperationType.CREATE_BRANCH,
-                status=GitOperation.Status.SUCCEEDED,
+            self._git("rev-parse", branch.name).stdout.strip(),
+            self._git("rev-parse", f"origin/{branch.name}").stdout.strip(),
+        )
+        self.assertTrue(
+            self.repository.git_logs.filter(
+                action__contains="登记已有分支",
+                result="success",
+            ).exists()
+        )
+
+        same_branch, created_again = register_development_branch(
+            self.repository,
+            "feature/existing",
+            "tester",
+        )
+        self.assertFalse(created_again)
+        self.assertEqual(same_branch.pk, branch.pk)
+        self.assertEqual(
+            Branch.objects.filter(
+                repository=self.repository,
+                name=branch.name,
             ).count(),
             1,
         )
 
-    def test_release_creation_recovers_when_database_record_is_missing(self):
-        branch = self._prepare_passed_branch()
-        release = create_release(self.repository, [branch.pk], "tester")
-        Release.objects.filter(pk=release.pk).delete()
-
-        recovered = create_release(self.repository, [branch.pk], "tester")
-
-        self.assertEqual(recovered.name, release.name)
-        self.assertEqual(recovered.branches.get(), branch)
-        self.assertEqual(
-            GitOperation.objects.filter(
-                operation_type=GitOperation.OperationType.CREATE_RELEASE,
-                status=GitOperation.Status.SUCCEEDED,
-            ).count(),
-            1,
-        )
-
-    def test_baseline_merge_recovers_database_status(self):
-        branch = self._prepare_passed_branch()
-        self.repository.saas_build_enabled = False
-        self.repository.save(update_fields=["saas_build_enabled"])
-        release = create_release(self.repository, [branch.pk], "tester")
-        check_release(release, "tester")
-        release.refresh_from_db()
-        mark_production_verified(release)
-        release.refresh_from_db()
-        merge_release_to_baseline(release, release.name, "tester")
-
-        release.status = Release.Status.PRODUCTION_VERIFIED
-        release.baseline_merged_at = None
-        release.save(update_fields=["status", "baseline_merged_at"])
-        merge_release_to_baseline(release, release.name, "tester")
-        release.refresh_from_db()
-
-        self.assertEqual(release.status, Release.Status.BASELINE_MERGED)
-        self.assertEqual(
-            GitOperation.objects.filter(
-                operation_type=GitOperation.OperationType.MERGE_BASELINE,
-                status=GitOperation.Status.SUCCEEDED,
-            ).count(),
-            1,
-        )
+    def test_register_rejects_missing_remote_branch(self):
+        with self.assertRaisesMessage(
+            WorkflowError,
+            "远程仓库中不存在开发分支",
+        ):
+            register_development_branch(
+                self.repository,
+                "feature/missing",
+                "tester",
+            )
 
     def test_build_success_can_be_cancelled_and_recreated_with_sequence(self):
         branch = self._prepare_passed_branch()
@@ -317,14 +331,6 @@ class WorkflowIntegrationTests(TransactionTestCase):
         self.assertEqual(replacement.name, f"{release.name}.2")
         self.assertTrue(
             BuildRecord.objects.filter(pk=build.pk).exists()
-        )
-        self.assertTrue(
-            GitOperation.objects.filter(
-                repository=self.repository,
-                operation_type=GitOperation.OperationType.CREATE_RELEASE,
-                status=GitOperation.Status.SUCCEEDED,
-            ).count()
-            >= 2
         )
 
     def test_custom_baseline_and_verification_branch_names(self):

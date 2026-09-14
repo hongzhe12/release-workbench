@@ -533,8 +533,41 @@ tbody tr:last-child td {
     grid-column: 1 / -1;
 }
 
-label {
+label,
+.field-label {
     font-weight: 650;
+}
+
+.branch-mode-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.branch-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 9px 11px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.branch-mode-option:has(input:checked) {
+    border-color: var(--accent);
+    background: rgba(23, 107, 87, 0.08);
+}
+
+.branch-mode-panel {
+    display: grid;
+    gap: 16px;
+}
+
+.branch-mode-panel[hidden] {
+    display: none;
 }
 
 input,
@@ -805,6 +838,7 @@ a:focus-visible {
     }
 
     .branch-strip,
+    .branch-mode-options,
     .choice-list,
     .form-grid {
         grid-template-columns: 1fr;

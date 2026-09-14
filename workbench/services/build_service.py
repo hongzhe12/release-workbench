@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import threading
 from pathlib import Path
@@ -8,14 +9,9 @@ from django.conf import settings
 from django.db import close_old_connections
 from django.utils import timezone
 
-from workbench.models import BuildRecord, GitOperation, Release
+from workbench.models import BuildRecord, Release
 
-from .git_service import (
-    GitService,
-    WorkflowError,
-    execute_git_operation,
-    repository_lock,
-)
+from .git_service import GitService, WorkflowError, repository_lock
 
 
 PACKAGE_PATTERN = re.compile(
@@ -29,6 +25,14 @@ def _resolve_build_command(repository):
     script_path = (repo_path / "build.sh").resolve()
     if not script_path.exists() or not script_path.is_file():
         raise WorkflowError(f"仓库根目录缺少标准打包脚本 build.sh：{script_path}")
+    if os.name == "nt":
+        git_path = shutil.which("git")
+        if git_path:
+            shell_path = (
+                Path(git_path).resolve().parent.parent / "bin" / "sh.exe"
+            )
+            if shell_path.exists():
+                return [str(shell_path), str(script_path)]
     return ["/bin/sh", str(script_path)]
 
 
@@ -41,7 +45,7 @@ def _find_package(output, repository):
             candidate = repo_path / candidate
         candidate = candidate.resolve()
         if candidate.exists() and candidate.is_file():
-            return str(candidate)
+            return candidate.as_posix()
     return ""
 
 
@@ -163,35 +167,9 @@ def start_build(release, operator):
         git.ensure_clean(allow_untracked=allow_untracked_retry)
         if not git.local_branch_exists(release.name):
             raise WorkflowError(f"本地 Release 分支不存在：{release.name}")
-        release_sha = git.ref_sha(release.name)
-
-        def preflight(operation, created):
-            git.ensure_repository()
-            git.ensure_clean(allow_untracked=allow_untracked_retry)
-            if not git.local_branch_exists(release.name):
-                raise WorkflowError(f"本地 Release 分支不存在：{release.name}")
-
-        def execute(operation, created):
-            git.checkout(release.name)
-
-        def verify(operation, created):
-            if not git.local_branch_exists(release.name):
-                return ""
-            if git.current_branch() != release.name:
-                return ""
-            return git.ref_sha(release.name)
-
-        execute_git_operation(
-            repository=repository,
-            operation_type=GitOperation.OperationType.CHECKOUT_FOR_BUILD,
-            target=release.name,
-            idempotency_key=(
-                f"checkout_for_build:{release.pk}:{release_sha}:{release.name}"
-            ),
-            preflight=preflight,
-            execute=execute,
-            verify=verify,
-        )
+        git.checkout(release.name)
+        if git.current_branch() != release.name:
+            raise WorkflowError(f"未能切换到 Release 分支：{release.name}")
         _resolve_build_command(repository)
 
         build, _ = BuildRecord.objects.update_or_create(

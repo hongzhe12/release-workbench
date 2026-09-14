@@ -3,7 +3,6 @@ from django.contrib import admin
 from .models import (
     Branch,
     BuildRecord,
-    GitOperation,
     GitOperationLog,
     Release,
     Repository,
@@ -60,28 +59,4 @@ class GitOperationLogAdmin(admin.ModelAdmin):
         "stdout",
         "stderr",
         "created_at",
-    )
-
-
-@admin.register(GitOperation)
-class GitOperationAdmin(admin.ModelAdmin):
-    list_display = (
-        "created_at",
-        "repository",
-        "operation_type",
-        "target",
-        "status",
-        "final_sha",
-    )
-    list_filter = ("repository", "operation_type", "status")
-    readonly_fields = (
-        "repository",
-        "operation_type",
-        "target",
-        "status",
-        "idempotency_key",
-        "log",
-        "final_sha",
-        "created_at",
-        "updated_at",
     )

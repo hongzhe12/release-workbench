@@ -108,6 +108,15 @@ class Branch(models.Model):
             raise ValidationError("分支名称不能包含连续的 ..。")
         return f"{branch_type}/{short_name}"
 
+    @staticmethod
+    def split_name(name):
+        name = (name or "").strip()
+        for branch_type in Branch.BranchType.values:
+            prefix = f"{branch_type}/"
+            if name.startswith(prefix):
+                return branch_type, name[len(prefix):]
+        raise ValidationError("分支名称必须以 feature/ 或 bugfix/ 开头。")
+
 
 class VerificationRecord(models.Model):
     class Status(models.TextChoices):
@@ -282,59 +291,3 @@ class GitOperationLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M:%S} {self.action}"
-
-
-class GitOperation(models.Model):
-    class OperationType(models.TextChoices):
-        CREATE_BRANCH = "create_branch", "创建开发分支"
-        MERGE_VERIFICATION = "merge_verification", "合入验证分支"
-        CREATE_RELEASE = "create_release", "创建 Release"
-        CONTINUE_RELEASE_MERGE = "continue_release_merge", "继续合并 Release"
-        MERGE_BASELINE = "merge_baseline", "合入发布基线"
-        CHECKOUT_FOR_BUILD = "checkout_for_build", "切换构建分支"
-
-    class Status(models.TextChoices):
-        PENDING = "pending", "待执行"
-        SUCCEEDED = "succeeded", "已完成"
-        FAILED = "failed", "执行前失败"
-        UNKNOWN = "unknown", "结果待确认"
-
-    repository = models.ForeignKey(
-        Repository,
-        on_delete=models.CASCADE,
-        related_name="git_operations",
-        verbose_name="仓库",
-    )
-    operation_type = models.CharField(
-        "操作类型",
-        max_length=40,
-        choices=OperationType.choices,
-    )
-    target = models.CharField("目标", max_length=300)
-    status = models.CharField(
-        "状态",
-        max_length=20,
-        choices=Status.choices,
-        default=Status.PENDING,
-    )
-    idempotency_key = models.CharField(
-        "幂等键",
-        max_length=300,
-        unique=True,
-    )
-    log = models.TextField("执行日志", blank=True)
-    final_sha = models.CharField("最终 SHA", max_length=64, blank=True)
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    updated_at = models.DateTimeField("更新时间", auto_now=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["repository", "-created_at"]),
-            models.Index(fields=["repository", "status"]),
-        ]
-        verbose_name = "Git 自动操作"
-        verbose_name_plural = "Git 自动操作"
-
-    def __str__(self):
-        return f"{self.get_operation_type_display()}: {self.target}"

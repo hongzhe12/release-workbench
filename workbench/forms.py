@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from django import forms
+from django.core.exceptions import ValidationError
+from django.db import models
 
 from .models import Branch, Repository, VerificationRecord
 
@@ -28,25 +30,80 @@ class RepositoryForm(forms.ModelForm):
 
 
 class BranchCreateForm(forms.Form):
+    class Mode(models.TextChoices):
+        CREATE = "create", "新建分支"
+        EXISTING = "existing", "选择已有分支"
+
+    mode = forms.ChoiceField(
+        label="处理方式",
+        choices=Mode.choices,
+        initial=Mode.CREATE,
+        widget=forms.RadioSelect,
+    )
     type = forms.ChoiceField(
         label="分支类型",
         choices=Branch.BranchType.choices,
+        required=False,
     )
     short_name = forms.CharField(
         label="分支名称",
         max_length=200,
+        required=False,
         help_text="只填写后缀，例如 feature/订单导出 或 bugfix/login-fix。",
     )
+    existing_branch = forms.ChoiceField(
+        label="已有分支",
+        required=False,
+        choices=(),
+    )
+
+    def __init__(self, *args, existing_branches=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.existing_branches = list(existing_branches)
+        self.fields["existing_branch"].choices = [
+            (name, name) for name in self.existing_branches
+        ]
+        if not self.existing_branches:
+            self.fields["existing_branch"].widget.attrs["disabled"] = True
 
     def clean(self):
         cleaned = super().clean()
-        branch_type = cleaned.get("type")
-        short_name = cleaned.get("short_name")
-        if branch_type and short_name:
+        mode = cleaned.get("mode")
+        if mode == self.Mode.CREATE:
+            branch_type = cleaned.get("type")
+            short_name = cleaned.get("short_name")
+            if not branch_type:
+                self.add_error("type", "请选择分支类型。")
+            if not short_name:
+                self.add_error("short_name", "请输入分支名称。")
+            if branch_type and short_name:
+                try:
+                    cleaned["branch_name"] = Branch.make_name(
+                        branch_type,
+                        short_name,
+                    )
+                    cleaned["branch_type"] = branch_type
+                except ValidationError as exc:
+                    self.add_error("short_name", exc)
+        elif mode == self.Mode.EXISTING:
+            branch_name = cleaned.get("existing_branch")
+            if not branch_name:
+                self.add_error("existing_branch", "请选择一个已有的开发分支。")
+                return cleaned
             try:
-                cleaned["branch_name"] = Branch.make_name(branch_type, short_name)
-            except forms.ValidationError as exc:
-                self.add_error("short_name", exc)
+                branch_type, short_name = Branch.split_name(branch_name)
+                normalized = Branch.make_name(branch_type, short_name)
+            except ValidationError as exc:
+                self.add_error("existing_branch", exc)
+            else:
+                if normalized != branch_name:
+                    self.add_error(
+                        "existing_branch",
+                        "已有分支名称包含不支持的字符。",
+                    )
+                else:
+                    cleaned["branch_name"] = branch_name
+                    cleaned["branch_type"] = branch_type
         return cleaned
 
 

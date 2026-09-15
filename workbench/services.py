@@ -108,9 +108,7 @@ class GitService:
             stderr=stderr,
         )
         if check and completed.returncode != 0:
-            raise GitCommandError(
-                f"{action}失败。"
-            )
+            raise GitCommandError(f"{action}失败：{stderr or stdout}")
         return completed
 
     def _write_log(self, action, command, result, stdout, stderr):
@@ -529,7 +527,7 @@ def _conflict_detail(git):
 
 
 def _next_release_name(repository, git):
-    base_name = f"release/{timezone.localdate():%Y%m%d}"
+    base_name = f"release-{timezone.localdate():%Y%m%d}"
     sequence = 1
     while True:
         name = base_name if sequence == 1 else f"{base_name}.{sequence}"

@@ -1,3 +1,5 @@
+import traceback
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -53,6 +55,8 @@ def _redirect_workbench(repository):
 
 
 def _workflow_error(request, exc):
+    with open(settings.BASE_DIR / "workbench.log", "a", encoding="utf-8") as log:
+        traceback.print_exc(file=log)
     messages.error(request, str(exc))
 
 

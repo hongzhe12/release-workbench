@@ -371,8 +371,6 @@ tbody tr:last-child td {
 
 .status-passed,
 .status-success,
-.status-succeeded,
-.status-build_success,
 .status-ready,
 .status-baseline_merged,
 .status-production_verified {
@@ -390,14 +388,12 @@ tbody tr:last-child td {
 
 .status-failed,
 .status-merge_failed,
-.status-build_failed,
 .status-cancelled {
     color: #8c252b;
     background: var(--danger-bg);
 }
 
-.status-pending,
-.status-unknown {
+.status-pending {
     color: #765017;
     background: var(--warning-bg);
 }
@@ -407,23 +403,6 @@ tbody tr:last-child td {
     flex-wrap: wrap;
     gap: 18px;
     margin-bottom: 14px;
-    color: var(--muted);
-}
-
-.compact-list {
-    border-top: 1px solid var(--line);
-}
-
-.compact-row {
-    min-height: 44px;
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) 110px 140px;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid var(--line);
-}
-
-.commit {
     color: var(--muted);
 }
 
@@ -640,11 +619,6 @@ a:focus-visible {
     white-space: pre-wrap;
 }
 
-.record-list {
-    display: grid;
-    gap: 8px;
-}
-
 .verification-guide {
     margin: 14px 0 18px;
     padding: 11px 13px;
@@ -844,7 +818,6 @@ a:focus-visible {
         grid-template-columns: 1fr;
     }
 
-    .compact-row,
     .release-row,
     .log-entry summary {
         grid-template-columns: 1fr;
@@ -865,7 +838,6 @@ a:focus-visible {
         grid-template-columns: 1fr;
     }
 
-    .compact-row,
     .release-row {
         padding: 10px 0;
     }

@@ -19,9 +19,9 @@ from .models import (
     Repository,
     VerificationRecord,
 )
-from .services.build_service import start_build
-from .services.git_service import GitService, WorkflowError
-from .services.workflows import (
+from .services import (
+    GitService,
+    WorkflowError,
     cancel_release,
     check_release,
     continue_release_merge,
@@ -31,6 +31,7 @@ from .services.workflows import (
     merge_branches_to_verification,
     merge_release_to_baseline,
     register_development_branch,
+    start_build,
     update_verification_status,
 )
 
@@ -272,7 +273,7 @@ def release_create(request, repository_id):
             _workflow_error(request, exc)
             return _redirect_workbench(repository)
         messages.success(request, f"已创建 Release {release.name}。")
-        return redirect("workbench:release_detail", release.pk)
+        return redirect("release_detail", release.pk)
     for error in form.errors.values():
         messages.error(request, error.as_text())
     return _redirect_workbench(repository)
@@ -338,7 +339,7 @@ def release_continue_merge(request, release_id):
         _workflow_error(request, exc)
     else:
         messages.success(request, "Release 分支合并完成。")
-    return redirect("workbench:release_detail", release.pk)
+    return redirect("release_detail", release.pk)
 
 
 @require_POST
@@ -350,7 +351,7 @@ def release_check(request, release_id):
         _workflow_error(request, exc)
     else:
         messages.success(request, "Release 检查通过，可以继续下一步。")
-    return redirect("workbench:release_detail", release.pk)
+    return redirect("release_detail", release.pk)
 
 
 @require_POST
@@ -360,9 +361,9 @@ def release_build(request, release_id):
         build = start_build(release, _operator())
     except WorkflowError as exc:
         _workflow_error(request, exc)
-        return redirect("workbench:release_detail", release.pk)
+        return redirect("release_detail", release.pk)
     messages.info(request, "SaaS 打包已启动。")
-    return redirect("workbench:build_detail", build.pk)
+    return redirect("build_detail", build.pk)
 
 
 def build_detail(request, build_id):
@@ -402,14 +403,14 @@ def release_verify(request, release_id):
     confirmation = request.POST.get("confirmation", "").strip()
     if confirmation != "生产验证通过":
         messages.error(request, "请输入“生产验证通过”完成二次确认。")
-        return redirect("workbench:release_detail", release.pk)
+        return redirect("release_detail", release.pk)
     try:
         mark_production_verified(release)
     except WorkflowError as exc:
         _workflow_error(request, exc)
     else:
         messages.success(request, "已记录生产验证通过。")
-    return redirect("workbench:release_detail", release.pk)
+    return redirect("release_detail", release.pk)
 
 
 @require_POST
@@ -429,7 +430,7 @@ def release_merge_baseline(request, release_id):
             f"{release.name} 已合入发布基线分支 "
             f"{release.repository.baseline_branch}。",
         )
-    return redirect("workbench:release_detail", release.pk)
+    return redirect("release_detail", release.pk)
 
 
 @require_POST
@@ -447,7 +448,7 @@ def release_cancel(request, release_id):
             request,
             f"{release.name} 已放弃，原分支、产物和日志已保留。",
         )
-    return redirect("workbench:release_detail", release.pk)
+    return redirect("release_detail", release.pk)
 
 
 def operation_logs(request, repository_id):

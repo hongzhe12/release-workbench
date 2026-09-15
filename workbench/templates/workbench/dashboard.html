@@ -8,7 +8,7 @@
         <p class="eyebrow">第一次使用</p>
         <h1>先把一个项目接入工作台</h1>
         <p>配置本地仓库路径、远程名称、发布基线分支和验证分支后，即可读取 Git 状态。</p>
-        <a class="button primary" href="{% url 'workbench:repository_create' %}">添加项目</a>
+        <a class="button primary" href="{% url 'repository_create' %}">添加项目</a>
     </section>
 {% else %}
     <section class="project-header">
@@ -71,7 +71,7 @@
                 <span class="step-number">01</span>
                 <h2>开发分支</h2>
             </div>
-            <a class="button secondary" href="{% url 'workbench:branch_create' repository.pk %}">
+            <a class="button secondary" href="{% url 'branch_create' repository.pk %}">
                 创建 / 管理
             </a>
         </div>
@@ -165,7 +165,7 @@
                         </div>
 
                         <div class="verification-actions">
-                            <form method="post" action="{% url 'workbench:verification_merge' repository.pk %}">
+                            <form method="post" action="{% url 'verification_merge' repository.pk %}">
                                 {% csrf_token %}
                                 <input type="hidden" name="branches" value="{{ branch.pk }}">
                                 <button
@@ -181,7 +181,7 @@
                                 <form
                                     class="verification-status-form"
                                     method="post"
-                                    action="{% url 'workbench:verification_record_update' branch.verification_record.pk %}"
+                                    action="{% url 'verification_record_update' branch.verification_record.pk %}"
                                 >
                                     {% csrf_token %}
                                     <select name="status" aria-label="{{ branch.name }} 验证状态">
@@ -235,13 +235,13 @@
                         {% endfor %}
                     </ul>
                 </div>
-                <a class="button primary" href="{% url 'workbench:release_detail' active_release.pk %}">
+                <a class="button primary" href="{% url 'release_detail' active_release.pk %}">
                     继续处理
                 </a>
             </div>
         {% else %}
             {% if passed_branches %}
-                <form method="post" action="{% url 'workbench:release_create' repository.pk %}">
+                <form method="post" action="{% url 'release_create' repository.pk %}">
                     {% csrf_token %}
                     <p class="muted">只允许选择验证通过，且验证提交仍有效的分支。</p>
                     <div class="choice-list">
@@ -271,12 +271,12 @@
                 <span class="step-number">04</span>
                 <h2>最近 Release</h2>
             </div>
-            <a class="button ghost" href="{% url 'workbench:operation_logs' repository.pk %}">
+            <a class="button ghost" href="{% url 'operation_logs' repository.pk %}">
                 操作日志
             </a>
         </div>
         {% if latest_release %}
-            <a class="release-row" href="{% url 'workbench:release_detail' latest_release.pk %}">
+            <a class="release-row" href="{% url 'release_detail' latest_release.pk %}">
                 <span class="mono">{{ latest_release.name }}</span>
                 <span class="status-pill status-{{ latest_release.status }}">
                     {{ latest_release.get_status_display }}

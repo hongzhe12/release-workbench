@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
@@ -42,17 +40,7 @@ class Repository(models.Model):
         return self.name
 
     def get_absolute_url(self):
-        return reverse("workbench:dashboard") + f"?repository={self.pk}"
-
-    def clean(self):
-        super().clean()
-        path = Path(self.local_path).expanduser()
-        if not path.is_absolute():
-            raise ValidationError({"local_path": "必须填写绝对路径。"})
-        if not path.exists():
-            raise ValidationError({"local_path": "路径不存在。"})
-        if not path.is_dir():
-            raise ValidationError({"local_path": "路径必须是目录。"})
+        return reverse("dashboard") + f"?repository={self.pk}"
 
 
 class Branch(models.Model):
@@ -224,7 +212,8 @@ class Release(models.Model):
         return self.name
 
     def get_absolute_url(self):
-        return reverse("workbench:release_detail", args=[self.pk])
+        return reverse("release_detail", args=[self.pk])
+
 
 class BuildRecord(models.Model):
     class Status(models.TextChoices):

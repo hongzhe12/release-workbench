@@ -9,7 +9,7 @@
         <h1 class="mono">{{ release.name }}</h1>
         <p class="muted">SaaS 打包日志</p>
     </div>
-    <a class="button ghost" href="{% url 'workbench:release_detail' release.pk %}">返回 Release</a>
+    <a class="button ghost" href="{% url 'release_detail' release.pk %}">返回 Release</a>
 </div>
 
 {% include "workbench/_build_status.html" %}

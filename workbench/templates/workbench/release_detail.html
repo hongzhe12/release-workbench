@@ -53,7 +53,7 @@
     </div>
     <div class="action-row">
         {% if can_continue_merge %}
-            <form method="post" action="{% url 'workbench:release_continue_merge' release.pk %}">
+            <form method="post" action="{% url 'release_continue_merge' release.pk %}">
                 {% csrf_token %}
                 <button class="button secondary" type="submit" data-confirm="确认冲突已经解决且工作区 clean，继续合并剩余分支？">
                     继续合并
@@ -62,14 +62,14 @@
         {% endif %}
 
         {% if can_check %}
-            <form method="post" action="{% url 'workbench:release_check' release.pk %}">
+            <form method="post" action="{% url 'release_check' release.pk %}">
                 {% csrf_token %}
                 <button class="button secondary" type="submit">检查 Release</button>
             </form>
         {% endif %}
 
         {% if can_build %}
-            <form method="post" action="{% url 'workbench:release_build' release.pk %}">
+            <form method="post" action="{% url 'release_build' release.pk %}">
                 {% csrf_token %}
                 <button class="button primary" type="submit" data-confirm="确认执行仓库根目录的 build.sh？同一 Release 只能成功构建一次。">
                     执行 SaaS 打包
@@ -94,7 +94,7 @@
             <h2>SaaS 构建</h2>
             <span class="status-pill status-{{ build.status }}">{{ build.get_status_display }}</span>
         </div>
-        <a class="button ghost" href="{% url 'workbench:build_detail' build.pk %}">查看日志</a>
+        <a class="button ghost" href="{% url 'build_detail' build.pk %}">查看日志</a>
     </div>
     {% if build.package_path %}
         <p>构建产物：<code>{{ build.package_path }}</code></p>
@@ -108,7 +108,7 @@
         <h2>生产验证</h2>
     </div>
     <p class="muted">工作台不会自动发布生产。人工发布并验证完成后，在这里记录结果。</p>
-    <form method="post" action="{% url 'workbench:release_verify' release.pk %}" class="inline-form">
+    <form method="post" action="{% url 'release_verify' release.pk %}" class="inline-form">
         {% csrf_token %}
         <label for="verify-confirmation">输入“生产验证通过”</label>
         <input id="verify-confirmation" type="text" name="confirmation" autocomplete="off">
@@ -125,7 +125,7 @@
     <p>
         该操作会更新 {{ repository.baseline_branch }} 并推送远程。输入完整分支名完成二次确认。
     </p>
-    <form method="post" action="{% url 'workbench:release_merge_baseline' release.pk %}" class="inline-form">
+    <form method="post" action="{% url 'release_merge_baseline' release.pk %}" class="inline-form">
         {% csrf_token %}
         <label for="baseline-confirmation">确认输入 <code>{{ release.name }}</code></label>
         <input id="baseline-confirmation" type="text" name="confirmation" autocomplete="off">
@@ -145,7 +145,7 @@
         放弃后保留当前分支、构建产物和日志，但不能再继续构建或发布。
         输入完整分支名后，可以重新创建带序号的新 Release。
     </p>
-    <form method="post" action="{% url 'workbench:release_cancel' release.pk %}" class="inline-form">
+    <form method="post" action="{% url 'release_cancel' release.pk %}" class="inline-form">
         {% csrf_token %}
         <label for="cancel-confirmation">确认输入 <code>{{ release.name }}</code></label>
         <input id="cancel-confirmation" type="text" name="confirmation" autocomplete="off">
@@ -159,7 +159,7 @@
 <section class="workflow-section">
     <div class="section-heading">
         <h2>最近 Git 操作</h2>
-        <a class="button ghost" href="{% url 'workbench:operation_logs' repository.pk %}">全部日志</a>
+        <a class="button ghost" href="{% url 'operation_logs' repository.pk %}">全部日志</a>
     </div>
     <div class="table-wrap">
         <table>

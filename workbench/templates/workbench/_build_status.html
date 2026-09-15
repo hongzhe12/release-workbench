@@ -1,7 +1,7 @@
 <section
     id="build-status"
     class="workflow-section"
-    {% if build.status == "building" %}data-poll-url="{% url 'workbench:build_status' build.pk %}"{% endif %}
+    {% if build.status == "building" %}data-poll-url="{% url 'build_status' build.pk %}"{% endif %}
 >
     <div class="section-heading">
         <div>

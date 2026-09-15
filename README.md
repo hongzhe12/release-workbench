@@ -84,3 +84,20 @@ python manage.py runserver 127.0.0.1:8000
 - 自动生产发布
 - CI/CD 平台替代
 - Redis、Celery 等额外基础组件
+
+
+```bash
+tar \
+  --exclude='release-workbench/.git' \
+  --exclude='release-workbench/.venv' \
+  --exclude='release-workbench/db.sqlite3' \
+  --exclude='release-workbench/staticfiles' \
+  --exclude='release-workbench/work' \
+  --exclude='release-workbench/outputs' \
+  --exclude='*/__pycache__' \
+  --exclude='*.pyc' \
+  --exclude='.DS_Store' \
+  -czf ~/Downloads/release-workbench.tar.gz \
+  -C /Users/hongzhe/Documents/Codex/2026-09-11 \
+  release-workbench
+```

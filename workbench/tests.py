@@ -79,6 +79,25 @@ class PageSmokeTests(TestCase):
             "bugfix/existing-fix",
         )
 
+    def test_existing_branch_form_accepts_feature_dash(self):
+        form = BranchCreateForm(
+            {
+                "mode": BranchCreateForm.Mode.EXISTING,
+                "existing_branch": "feature-existing-fix",
+            },
+            existing_branches=["feature-existing-fix"],
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["branch_type"],
+            Branch.BranchType.FEATURE,
+        )
+        self.assertEqual(
+            form.cleaned_data["branch_name"],
+            "feature-existing-fix",
+        )
+
     def test_dashboard_with_repository_renders(self):
         repository = Repository.objects.create(
             name="project",

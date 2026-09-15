@@ -142,11 +142,10 @@ def branch_create(request, repository_id):
                 continue
             try:
                 branch_type, short_name = Branch.split_name(branch_name)
-                normalized = Branch.make_name(branch_type, short_name)
+                Branch.make_name(branch_type, short_name)
             except ValidationError:
                 continue
-            if normalized == branch_name:
-                existing_branches.append(branch_name)
+            existing_branches.append(branch_name)
     except WorkflowError as exc:
         branch_list_error = str(exc)
 

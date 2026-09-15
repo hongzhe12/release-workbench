@@ -92,18 +92,12 @@ class BranchCreateForm(forms.Form):
                 return cleaned
             try:
                 branch_type, short_name = Branch.split_name(branch_name)
-                normalized = Branch.make_name(branch_type, short_name)
+                Branch.make_name(branch_type, short_name)
             except ValidationError as exc:
                 self.add_error("existing_branch", exc)
             else:
-                if normalized != branch_name:
-                    self.add_error(
-                        "existing_branch",
-                        "已有分支名称包含不支持的字符。",
-                    )
-                else:
-                    cleaned["branch_name"] = branch_name
-                    cleaned["branch_type"] = branch_type
+                cleaned["branch_name"] = branch_name
+                cleaned["branch_type"] = branch_type
         return cleaned
 
 

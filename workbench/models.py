@@ -99,11 +99,16 @@ class Branch(models.Model):
     @staticmethod
     def split_name(name):
         name = (name or "").strip()
-        for branch_type in Branch.BranchType.values:
-            prefix = f"{branch_type}/"
-            if name.startswith(prefix):
-                return branch_type, name[len(prefix):]
-        raise ValidationError("分支名称必须以 feature/ 或 bugfix/ 开头。")
+        for branch_type, prefixes in (
+            (Branch.BranchType.FEATURE, ("feature/", "feature-")),
+            (Branch.BranchType.BUGFIX, ("bugfix/",)),
+        ):
+            for prefix in prefixes:
+                if name.startswith(prefix):
+                    return branch_type, name[len(prefix):]
+        raise ValidationError(
+            "分支名称必须以 feature/、feature- 或 bugfix/ 开头。"
+        )
 
 
 class VerificationRecord(models.Model):

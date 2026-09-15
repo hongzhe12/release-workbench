@@ -583,12 +583,8 @@ def create_development_branch(repository, branch_type, short_name, operator):
 def register_development_branch(repository, branch_name, operator):
     branch_name = (branch_name or "").strip()
     try:
-        branch_type, _ = Branch.split_name(branch_name)
-        if (
-            Branch.make_name(branch_type, branch_name.split("/", 1)[1])
-            != branch_name
-        ):
-            raise ValidationError("已有分支名称包含不支持的字符。")
+        branch_type, short_name = Branch.split_name(branch_name)
+        Branch.make_name(branch_type, short_name)
     except ValidationError as exc:
         raise WorkflowError(str(exc)) from exc
 

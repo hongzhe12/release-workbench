@@ -60,6 +60,7 @@ class Branch(models.Model):
         max_length=20,
         choices=BranchType.choices,
     )
+    removed = models.BooleanField("已从界面移除", default=False)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
@@ -95,20 +96,6 @@ class Branch(models.Model):
         if ".." in short_name:
             raise ValidationError("分支名称不能包含连续的 ..。")
         return f"{branch_type}/{short_name}"
-
-    @staticmethod
-    def split_name(name):
-        name = (name or "").strip()
-        for branch_type, prefixes in (
-            (Branch.BranchType.FEATURE, ("feature/", "feature-")),
-            (Branch.BranchType.BUGFIX, ("bugfix/",)),
-        ):
-            for prefix in prefixes:
-                if name.startswith(prefix):
-                    return branch_type, name[len(prefix):]
-        raise ValidationError(
-            "分支名称必须以 feature/、feature- 或 bugfix/ 开头。"
-        )
 
 
 class VerificationRecord(models.Model):

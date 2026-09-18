@@ -549,6 +549,64 @@ label,
     display: none;
 }
 
+.branch-picker {
+    position: relative;
+}
+
+.branch-picker-toggle {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--ink);
+    background: #ffffff;
+    border: 1px solid #b7c0ce;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.branch-picker-menu {
+    position: absolute;
+    z-index: 5;
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px;
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: 0 10px 24px rgba(23, 32, 51, 0.14);
+}
+
+.branch-picker-menu[hidden] {
+    display: none;
+}
+
+.branch-picker-options {
+    max-height: 240px;
+    margin-top: 8px;
+    overflow-y: auto;
+}
+
+.branch-picker-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.branch-picker-option:hover {
+    background: #f4f6f9;
+}
+
+.branch-picker-option[hidden] {
+    display: none;
+}
+
 input,
 select,
 textarea {

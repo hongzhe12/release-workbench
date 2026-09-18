@@ -51,7 +51,7 @@ class BranchCreateForm(forms.Form):
         required=False,
         help_text="只填写后缀，例如 feature/订单导出 或 bugfix/login-fix。",
     )
-    existing_branch = forms.ChoiceField(
+    existing_branch = forms.MultipleChoiceField(
         label="已有分支",
         required=False,
         choices=(),
@@ -63,8 +63,6 @@ class BranchCreateForm(forms.Form):
         self.fields["existing_branch"].choices = [
             (name, name) for name in self.existing_branches
         ]
-        if not self.existing_branches:
-            self.fields["existing_branch"].widget.attrs["disabled"] = True
 
     def clean(self):
         cleaned = super().clean()
@@ -86,18 +84,11 @@ class BranchCreateForm(forms.Form):
                 except ValidationError as exc:
                     self.add_error("short_name", exc)
         elif mode == self.Mode.EXISTING:
-            branch_name = cleaned.get("existing_branch")
-            if not branch_name:
-                self.add_error("existing_branch", "请选择一个已有的开发分支。")
+            branch_names = cleaned.get("existing_branch")
+            if not branch_names:
+                self.add_error("existing_branch", "请至少选择一个已有开发分支。")
                 return cleaned
-            try:
-                branch_type, short_name = Branch.split_name(branch_name)
-                Branch.make_name(branch_type, short_name)
-            except ValidationError as exc:
-                self.add_error("existing_branch", exc)
-            else:
-                cleaned["branch_name"] = branch_name
-                cleaned["branch_type"] = branch_type
+            cleaned["branch_names"] = branch_names
         return cleaned
 
 
@@ -111,7 +102,8 @@ class VerificationMergeForm(forms.Form):
     def __init__(self, *args, repository=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["branches"].queryset = Branch.objects.filter(
-            repository=repository
+            repository=repository,
+            removed=False,
         ).select_related("verification_record")
 
 
@@ -136,6 +128,7 @@ class ReleaseCreateForm(forms.Form):
         self.fields["branches"].queryset = (
             Branch.objects.filter(
                 repository=repository,
+                removed=False,
                 verification_record__status=VerificationRecord.Status.PASSED,
             )
             .exclude(verification_record__merged_commit="")

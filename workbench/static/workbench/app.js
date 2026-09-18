@@ -62,6 +62,45 @@
         syncBranchMode();
     }
 
+    var branchPicker = document.querySelector("[data-branch-picker]");
+    if (branchPicker) {
+        var pickerMenu = branchPicker.querySelector("[data-branch-menu]");
+        var pickerSummary = branchPicker.querySelector("[data-branch-summary]");
+        var pickerOptions = Array.from(
+            branchPicker.querySelectorAll("[data-branch-option]")
+        );
+        var pickerBoxes = pickerOptions.map(function (option) {
+            return option.querySelector("input");
+        });
+        var syncPickerSummary = function () {
+            var count = pickerBoxes.filter(function (box) {
+                return box.checked;
+            }).length;
+            pickerSummary.textContent = count ? "已选择 " + count + " 个分支" : "选择分支";
+        };
+        branchPicker.querySelector("[data-branch-toggle]").addEventListener(
+            "click",
+            function () {
+                pickerMenu.hidden = !pickerMenu.hidden;
+            }
+        );
+        branchPicker.querySelector("[data-branch-search]").addEventListener(
+            "input",
+            function (event) {
+                var keyword = event.target.value.trim().toLowerCase();
+                pickerOptions.forEach(function (option) {
+                    option.hidden = !option.textContent
+                        .toLowerCase()
+                        .includes(keyword);
+                });
+            }
+        );
+        pickerBoxes.forEach(function (box) {
+            box.addEventListener("change", syncPickerSummary);
+        });
+        syncPickerSummary();
+    }
+
     document.querySelectorAll("form").forEach(function (form) {
         form.addEventListener("submit", function () {
             window.setTimeout(function () {

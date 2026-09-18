@@ -11,6 +11,11 @@ urlpatterns = [
         name="branch_create",
     ),
     path(
+        "branches/<int:branch_id>/remove/",
+        views.branch_remove,
+        name="branch_remove",
+    ),
+    path(
         "repositories/<int:repository_id>/verification/merge/",
         views.verification_merge,
         name="verification_merge",

@@ -83,6 +83,7 @@
                         <th>类型</th>
                         <th>验证</th>
                         <th>备注</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -100,10 +101,21 @@
                                 {% endif %}
                             </td>
                             <td>{{ branch.verification_record.remark|default:"-"|truncatechars:60 }}</td>
+                            <td>
+                                <form method="post" action="{% url 'branch_remove' branch.pk %}">
+                                    {% csrf_token %}
+                                    <button
+                                        class="button ghost"
+                                        type="submit"
+                                        data-confirm="确认从界面移除 {{ branch.name }}？不会删除 Git 分支。">
+                                        移除
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4" class="empty-cell">还没有由工作台管理的开发分支。</td>
+                            <td colspan="5" class="empty-cell">还没有由工作台管理的开发分支。</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -244,16 +256,30 @@
                 <form method="post" action="{% url 'release_create' repository.pk %}">
                     {% csrf_token %}
                     <p class="muted">只允许选择验证通过，且验证提交仍有效的分支。</p>
-                    <div class="choice-list">
-                        {% for branch in passed_branches %}
-                            <label class="choice">
-                                <input type="checkbox" name="branches" value="{{ branch.pk }}">
-                                <span>
-                                    <strong class="mono">{{ branch.name }}</strong>
-                                    <small>验证提交 {{ branch.verification_record.merged_commit|slice:":12" }}</small>
-                                </span>
-                            </label>
-                        {% endfor %}
+                    <div class="branch-picker" data-branch-picker>
+                        <button class="branch-picker-toggle" type="button" data-branch-toggle>
+                            <span data-branch-summary>选择分支</span>
+                            <span class="muted">▾</span>
+                        </button>
+                        <div class="branch-picker-menu" data-branch-menu hidden>
+                            <input
+                                type="search"
+                                data-branch-search
+                                placeholder="搜索分支"
+                                autocomplete="off"
+                                aria-label="搜索发布分支">
+                            <div class="branch-picker-options">
+                                {% for branch in passed_branches %}
+                                    <label class="branch-picker-option" data-branch-option>
+                                        <input type="checkbox" name="branches" value="{{ branch.pk }}">
+                                        <span>
+                                            <strong class="mono">{{ branch.name }}</strong>
+                                            <small>验证提交 {{ branch.verification_record.merged_commit|slice:":12" }}</small>
+                                        </span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                     <button class="button primary" type="submit" data-confirm="确认基于最新 {{ repository.baseline_branch }} 创建预发布分支并合并所选内容？">
                         创建预发布分支

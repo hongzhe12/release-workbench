@@ -546,7 +546,11 @@ def _save_development_branch(repository, branch_name, branch_type):
         name=branch_name,
         defaults={"type": branch_type},
     )
-    if not created and branch.type != branch_type:
+    if branch.removed:
+        branch.removed = False
+        branch.save(update_fields=["removed"])
+        created = True
+    if branch.type != branch_type:
         branch.type = branch_type
         branch.save(update_fields=["type"])
     VerificationRecord.objects.get_or_create(branch=branch)
@@ -580,11 +584,11 @@ def create_development_branch(repository, branch_type, short_name, operator):
 
 def register_development_branch(repository, branch_name, operator):
     branch_name = (branch_name or "").strip()
-    try:
-        branch_type, short_name = Branch.split_name(branch_name)
-        Branch.make_name(branch_type, short_name)
-    except ValidationError as exc:
-        raise WorkflowError(str(exc)) from exc
+    branch_type = (
+        Branch.BranchType.BUGFIX
+        if branch_name.startswith("bugfix")
+        else Branch.BranchType.FEATURE
+    )
 
     with repository_operation(repository.pk):
         git = GitService(repository, operator)

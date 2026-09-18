@@ -60,43 +60,45 @@ class PageSmokeTests(TestCase):
         self.assertContains(response, "新建分支")
         self.assertContains(response, "选择已有分支")
 
-    def test_existing_branch_form_infers_branch_type(self):
+    def test_existing_branch_form_accepts_any_branch_name(self):
         form = BranchCreateForm(
             {
                 "mode": BranchCreateForm.Mode.EXISTING,
-                "existing_branch": "bugfix/existing-fix",
+                "existing_branch": "release/20260101",
             },
-            existing_branches=["bugfix/existing-fix"],
+            existing_branches=["release/20260101"],
         )
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(
-            form.cleaned_data["branch_type"],
-            Branch.BranchType.BUGFIX,
-        )
-        self.assertEqual(
             form.cleaned_data["branch_name"],
-            "bugfix/existing-fix",
+            "release/20260101",
         )
 
-    def test_existing_branch_form_accepts_feature_dash(self):
-        form = BranchCreateForm(
-            {
-                "mode": BranchCreateForm.Mode.EXISTING,
-                "existing_branch": "feature-existing-fix",
-            },
-            existing_branches=["feature-existing-fix"],
+    def test_branch_remove_hides_branch_from_dashboard(self):
+        repository = Repository.objects.create(
+            name="project",
+            local_path="/tmp",
+            remote_url="origin",
+            baseline_branch="stable",
+            verification_branch="uat",
+        )
+        branch = Branch.objects.create(
+            repository=repository,
+            name="feature/orders",
+            type=Branch.BranchType.FEATURE,
         )
 
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(
-            form.cleaned_data["branch_type"],
-            Branch.BranchType.FEATURE,
+        response = self.client.post(reverse("branch_remove", args=[branch.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        branch.refresh_from_db()
+        self.assertTrue(branch.removed)
+        dashboard = self.client.get(
+            reverse("dashboard"),
+            {"repository": repository.pk},
         )
-        self.assertEqual(
-            form.cleaned_data["branch_name"],
-            "feature-existing-fix",
-        )
+        self.assertNotContains(dashboard, "feature/orders")
 
     def test_dashboard_with_repository_renders(self):
         repository = Repository.objects.create(

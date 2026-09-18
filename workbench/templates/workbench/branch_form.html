@@ -9,8 +9,7 @@
             <p class="eyebrow">{{ repository.name }}</p>
             <h1>添加开发分支</h1>
             <p class="muted">
-                可以新建分支并推送，也可以登记仓库中已有的
-                feature 或 bugfix 分支。
+                可以新建分支并推送，也可以登记仓库中已有的远端分支。
             </p>
         </div>
         <a class="button ghost" href="{{ repository.get_absolute_url }}">返回工作台</a>
@@ -51,12 +50,31 @@
 
         <div class="branch-mode-panel" data-branch-panel="existing">
             <div class="form-field">
-                <label for="{{ form.existing_branch.id_for_label }}">{{ form.existing_branch.label }}</label>
-                {{ form.existing_branch }}
+                <span class="field-label">{{ form.existing_branch.label }}</span>
                 {% if form.existing_branches %}
-                    <p class="help-text">
-                        仅显示尚未登记的 feature 和 bugfix 远端分支。
-                    </p>
+                    <div class="branch-picker" data-branch-picker>
+                        <button class="branch-picker-toggle" type="button" data-branch-toggle>
+                            <span data-branch-summary>选择分支</span>
+                            <span class="muted">▾</span>
+                        </button>
+                        <div class="branch-picker-menu" data-branch-menu hidden>
+                            <input
+                                type="search"
+                                data-branch-search
+                                placeholder="搜索分支"
+                                autocomplete="off"
+                                aria-label="搜索已有分支">
+                            <div class="branch-picker-options">
+                                {% for branch_name in form.existing_branches %}
+                                    <label class="branch-picker-option" data-branch-option>
+                                        <input type="checkbox" name="existing_branch" value="{{ branch_name }}" {% if branch_name in form.existing_branch.value|default:"" %}checked{% endif %}>
+                                        <span class="mono">{{ branch_name }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <p class="help-text">可多选，仅列出远端尚未登记的分支。</p>
                 {% else %}
                     <p class="help-text">当前没有可登记的已有开发分支。</p>
                 {% endif %}
@@ -72,7 +90,7 @@
         {% for error in form.non_field_errors %}
             <p class="field-error">{{ error }}</p>
         {% endfor %}
-        <button class="button primary" type="submit" data-confirm="确认添加该开发分支？">
+        <button class="button primary" type="submit" data-confirm="确认添加所选的开发分支？">
             确认添加
         </button>
     </form>

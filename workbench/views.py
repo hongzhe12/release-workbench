@@ -2,7 +2,6 @@ import traceback
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -71,13 +70,15 @@ def dashboard(request):
         return render(request, "workbench/dashboard.html", context)
 
     branches = list(
-        repository.branches.select_related("verification_record").order_by("name")
+        repository.branches.filter(removed=False)
+        .select_related("verification_record")
+        .order_by("name")
     )
     verification_counts = {
         row["verification_record__status"]: row["count"]
-        for row in repository.branches.values("verification_record__status").annotate(
-            count=Count("id")
-        )
+        for row in repository.branches.filter(removed=False)
+        .values("verification_record__status")
+        .annotate(count=Count("id"))
     }
     active_release = (
         repository.releases.exclude(
@@ -132,24 +133,20 @@ def branch_create(request, repository_id):
         git = GitService(repository, _operator())
         git.ensure_repository()
         registered_names = set(
-            repository.branches.values_list("name", flat=True)
+            repository.branches.filter(removed=False).values_list(
+                "name", flat=True
+            )
         )
         reserved_names = {
             repository.baseline_branch,
             repository.verification_branch,
         }
-        for branch_name in git.remote_branches():
-            if (
-                branch_name in registered_names
-                or branch_name in reserved_names
-            ):
-                continue
-            try:
-                branch_type, short_name = Branch.split_name(branch_name)
-                Branch.make_name(branch_type, short_name)
-            except ValidationError:
-                continue
-            existing_branches.append(branch_name)
+        existing_branches = [
+            branch_name
+            for branch_name in git.remote_branches()
+            if branch_name not in registered_names
+            and branch_name not in reserved_names
+        ]
     except WorkflowError as exc:
         branch_list_error = str(exc)
 
@@ -168,21 +165,18 @@ def branch_create(request, repository_id):
                 )
                 messages.success(request, f"已创建并推送分支 {branch.name}。")
             else:
-                branch, created = register_development_branch(
-                    repository=repository,
-                    branch_name=form.cleaned_data["branch_name"],
-                    operator=_operator(),
+                names = []
+                for branch_name in form.cleaned_data["branch_names"]:
+                    branch, _ = register_development_branch(
+                        repository=repository,
+                        branch_name=branch_name,
+                        operator=_operator(),
+                    )
+                    names.append(branch.name)
+                messages.success(
+                    request,
+                    "已登记已有分支：" + "、".join(names) + "。",
                 )
-                if created:
-                    messages.success(
-                        request,
-                        f"已登记已有分支 {branch.name}。",
-                    )
-                else:
-                    messages.info(
-                        request,
-                        f"分支 {branch.name} 已经登记。",
-                    )
         except WorkflowError as exc:
             _workflow_error(request, exc)
         else:
@@ -196,6 +190,18 @@ def branch_create(request, repository_id):
             "branch_list_error": branch_list_error,
         },
     )
+
+
+@require_POST
+def branch_remove(request, branch_id):
+    branch = get_object_or_404(
+        Branch.objects.select_related("repository"),
+        pk=branch_id,
+    )
+    branch.removed = True
+    branch.save(update_fields=["removed"])
+    messages.success(request, f"已从界面移除 {branch.name}，Git 分支未删除。")
+    return _redirect_workbench(branch.repository)
 
 
 @require_POST
